@@ -99,23 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         options: {
           emailRedirectTo: window.location.origin,
-          data: { full_name: fullName }
+          data: { full_name: fullName, role: signUpRole || 'cliente' }
         }
       });
       
       if (error) return { error: new Error(error.message) };
-      
-      // Create role for the new user
-      if (data.user && signUpRole) {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: data.user.id, role: signUpRole });
-        
-        if (roleError) {
-          console.error('Error creating role:', roleError);
-        }
-      }
-      
+
       return { error: null };
     } catch (err) {
       return { error: err as Error };
