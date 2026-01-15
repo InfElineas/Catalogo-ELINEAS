@@ -22,11 +22,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useClientCatalogs, useClientCatalogItems } from "@/hooks/useClientCatalogs";
+import { useGestors } from "@/hooks/useGestors";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function ClienteDashboard() {
   const { data: catalogs, isLoading: catalogsLoading } = useClientCatalogs();
+  const { data: gestores, isLoading: gestoresLoading } = useGestors();
   const [selectedCatalog, setSelectedCatalog] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -71,6 +73,35 @@ export default function ClienteDashboard() {
           <p className="text-muted-foreground max-w-md">
             Contacta a tu gestor para que te asigne acceso a los catálogos disponibles.
           </p>
+          <div className="mt-6 w-full max-w-md space-y-3">
+            {gestoresLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((item) => (
+                  <Skeleton key={item} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : gestores && gestores.length > 0 ? (
+              gestores.map((gestor) => (
+                <Card key={gestor.id}>
+                  <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-4">
+                    <div className="text-left">
+                      <p className="font-medium">
+                        {gestor.full_name || gestor.email.split('@')[0]}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{gestor.email}</p>
+                    </div>
+                    <Button asChild variant="outline" className="justify-center">
+                      <a href={`mailto:${gestor.email}`}>Escribir</a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No hay gestores disponibles para contacto.
+              </p>
+            )}
+          </div>
         </div>
       </DashboardLayout>
     );
