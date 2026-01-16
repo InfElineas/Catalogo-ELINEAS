@@ -5,6 +5,7 @@ export interface GestorProfile {
   id: string;
   full_name: string | null;
   email: string;
+  sales_description: string | null;
 }
 
 export function useGestors() {
@@ -23,7 +24,7 @@ export function useGestors() {
 
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, full_name')
+        .select('id, email, full_name, sales_description')
         .in('id', gestorIds)
         .order('full_name', { ascending: true, nullsFirst: false });
 

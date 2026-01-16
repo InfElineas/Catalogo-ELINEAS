@@ -34,6 +34,7 @@ const gestorNavItems = [
 
 const clienteNavItems = [
   { icon: LayoutDashboard, label: "Mis Catálogos", href: "/cliente" },
+  { icon: Settings, label: "Perfil", href: "/configuracion" },
 ];
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {

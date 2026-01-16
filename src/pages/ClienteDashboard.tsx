@@ -89,6 +89,11 @@ export default function ClienteDashboard() {
                         {gestor.full_name || gestor.email.split('@')[0]}
                       </p>
                       <p className="text-sm text-muted-foreground">{gestor.email}</p>
+                      {gestor.sales_description && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {gestor.sales_description}
+                        </p>
+                      )}
                     </div>
                     <Button asChild variant="outline" className="justify-center">
                       <a href={`mailto:${gestor.email}`}>Escribir</a>

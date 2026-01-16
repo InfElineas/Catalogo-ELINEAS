@@ -69,7 +69,7 @@ export function useClients() {
           upsertEntries.push({
             name: existingByUser?.name || existingByEmail?.name || fallbackName,
             email: profile.email,
-            status: existingByUser?.status || existingByEmail?.status || 'active',
+            status: 'active',
             user_id: profile.id,
             created_by: existingByUser?.created_by || existingByEmail?.created_by || user.id,
             deleted_at: null,
@@ -148,7 +148,7 @@ export function useCreateClient() {
             name: data.name,
             user_id: existingClient.user_id || profile?.id || null,
             deleted_at: null,
-            status: existingClient.status === 'inactive' ? 'pending' : existingClient.status,
+            status: 'active',
           })
           .eq('id', existingClient.id)
           .select()
@@ -163,6 +163,7 @@ export function useCreateClient() {
         .insert({
           name: data.name,
           email: normalizedEmail,
+          status: 'active',
           created_by: user.id,
           user_id: profile?.id || null,
         })
