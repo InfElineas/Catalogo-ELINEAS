@@ -16,15 +16,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppConfig, useUpdateConfig } from "@/hooks/useAppConfig";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useGestorProfile, useUpdateGestorProfile } from "@/hooks/useGestorProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileText, Upload, Building2, Save, User } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function Configuracion() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { data: config, isLoading, error } = useAppConfig();
   const updateConfig = useUpdateConfig();
   const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: gestorProfile, isLoading: gestorLoading } = useGestorProfile();
+  const updateGestorProfile = useUpdateGestorProfile();
   const updateProfile = useUpdateProfile();
 
   // Local state for form fields
@@ -46,8 +49,11 @@ export default function Configuracion() {
   const [profileForm, setProfileForm] = useState({
     full_name: '',
     avatar_url: '',
+  });
+  const [gestorForm, setGestorForm] = useState({
     sales_description: '',
   });
+  const [gestorInitialized, setGestorInitialized] = useState(false);
   const [profileInitialized, setProfileInitialized] = useState(false);
 
   // Initialize forms when config loads
@@ -62,9 +68,15 @@ export default function Configuracion() {
     setProfileForm({
       full_name: profile.full_name || '',
       avatar_url: profile.avatar_url || '',
-      sales_description: profile.sales_description || '',
     });
     setProfileInitialized(true);
+  }
+
+  if (gestorProfile && !gestorInitialized) {
+    setGestorForm({
+      sales_description: gestorProfile.sales_description || '',
+    });
+    setGestorInitialized(true);
   }
 
   const handleSaveGeneral = async () => {
@@ -83,7 +95,12 @@ export default function Configuracion() {
     await updateProfile.mutateAsync({
       full_name: profileForm.full_name,
       avatar_url: profileForm.avatar_url || null,
-      sales_description: profileForm.sales_description || null,
+    });
+  };
+
+  const handleSaveGestorProfile = async () => {
+    await updateGestorProfile.mutateAsync({
+      sales_description: gestorForm.sales_description || null,
     });
   };
 
@@ -139,6 +156,12 @@ export default function Configuracion() {
                 <User className="h-4 w-4" />
                 Perfil
               </TabsTrigger>
+              {role === 'gestor' && (
+                <TabsTrigger value="comercial" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Comercial
+                </TabsTrigger>
+              )}
               <TabsTrigger value="general" className="gap-2">
                 <Building2 className="h-4 w-4" />
                 General
@@ -158,7 +181,7 @@ export default function Configuracion() {
                 <CardHeader>
                   <CardTitle>Perfil</CardTitle>
                   <CardDescription>
-                    Actualiza tu información pública y descripción comercial.
+                    Actualiza tu información pública de usuario.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -192,16 +215,6 @@ export default function Configuracion() {
                           placeholder="https://..."
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="profile-description">Descripción comercial</Label>
-                        <Textarea
-                          id="profile-description"
-                          value={profileForm.sales_description}
-                          onChange={(e) => setProfileForm(prev => ({ ...prev, sales_description: e.target.value }))}
-                          placeholder="Cuéntales a los clientes cómo puedes ayudarles."
-                          rows={4}
-                        />
-                      </div>
                       <div className="pt-4">
                         <Button onClick={handleSaveProfile} disabled={updateProfile.isPending}>
                           <Save className="h-4 w-4 mr-2" />
@@ -213,6 +226,43 @@ export default function Configuracion() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {role === 'gestor' && (
+              <TabsContent value="comercial">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Perfil comercial</CardTitle>
+                    <CardDescription>
+                      Comparte una descripción para que los clientes te contacten.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {gestorLoading ? (
+                      <Skeleton className="h-24 w-full" />
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="sales-description">Descripción comercial</Label>
+                          <Textarea
+                            id="sales-description"
+                            value={gestorForm.sales_description}
+                            onChange={(e) => setGestorForm({ sales_description: e.target.value })}
+                            placeholder="Ej. Ayudo a equipos comerciales a mantener catálogos actualizados."
+                            rows={4}
+                          />
+                        </div>
+                        <div className="pt-4">
+                          <Button onClick={handleSaveGestorProfile} disabled={updateGestorProfile.isPending}>
+                            <Save className="h-4 w-4 mr-2" />
+                            {updateGestorProfile.isPending ? 'Guardando...' : 'Guardar descripción'}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
 
             <TabsContent value="general">
               <Card>

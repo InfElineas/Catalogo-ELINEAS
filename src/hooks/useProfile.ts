@@ -8,7 +8,6 @@ export interface ProfileData {
   email: string;
   full_name: string | null;
   avatar_url: string | null;
-  sales_description: string | null;
 }
 
 export function useProfile() {
@@ -21,7 +20,7 @@ export function useProfile() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, avatar_url, sales_description')
+        .select('id, email, full_name, avatar_url')
         .eq('id', user.id)
         .single();
 
@@ -44,7 +43,7 @@ export function useUpdateProfile() {
         .from('profiles')
         .update(data)
         .eq('id', user.id)
-        .select('id, email, full_name, avatar_url, sales_description')
+        .select('id, email, full_name, avatar_url')
         .single();
 
       if (error) throw error;
