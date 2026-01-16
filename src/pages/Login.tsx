@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileSpreadsheet, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Login() {
@@ -89,20 +89,23 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center">
-            <FileSpreadsheet className="h-7 w-7 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">CMS de Catálogos</CardTitle>
-          <CardDescription>
-            Administra tus catálogos de precios
-          </CardDescription>
-        </CardHeader>
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 text-white">
+      <div className="pointer-events-none absolute -top-32 right-0 h-80 w-80 rounded-full bg-primary/20 blur-[120px]" />
+      <div className="pointer-events-none absolute -bottom-24 left-0 h-80 w-80 rounded-full bg-cyan-400/20 blur-[140px]" />
+      <div className="relative mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center">
+        <Card className="w-full max-w-md border-white/10 bg-white/5 text-white shadow-2xl backdrop-blur">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10">
+              <img src="/brand-mark.svg" alt="Catalogia" className="h-10 w-10" />
+            </div>
+            <CardTitle className="text-3xl">Catalogia</CardTitle>
+            <CardDescription className="text-white/70">
+              Gestiona catálogos y clientes con una experiencia moderna.
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 bg-white/10 text-white">
               <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
               <TabsTrigger value="signup">Registrarse</TabsTrigger>
             </TabsList>
@@ -118,6 +121,7 @@ export default function Login() {
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     disabled={isSubmitting}
+                    className="border-white/20 bg-white/10 text-white placeholder:text-white/50"
                   />
                 </div>
                 <div className="space-y-2">
@@ -129,6 +133,7 @@ export default function Login() {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     disabled={isSubmitting}
+                    className="border-white/20 bg-white/10 text-white placeholder:text-white/50"
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -155,6 +160,7 @@ export default function Login() {
                     value={signupName}
                     onChange={(e) => setSignupName(e.target.value)}
                     disabled={isSubmitting}
+                    className="border-white/20 bg-white/10 text-white placeholder:text-white/50"
                   />
                 </div>
                 <div className="space-y-2">
@@ -166,6 +172,7 @@ export default function Login() {
                     value={signupEmail}
                     onChange={(e) => setSignupEmail(e.target.value)}
                     disabled={isSubmitting}
+                    className="border-white/20 bg-white/10 text-white placeholder:text-white/50"
                   />
                 </div>
                 <div className="space-y-2">
@@ -177,6 +184,7 @@ export default function Login() {
                     value={signupPassword}
                     onChange={(e) => setSignupPassword(e.target.value)}
                     disabled={isSubmitting}
+                    className="border-white/20 bg-white/10 text-white placeholder:text-white/50"
                   />
                 </div>
                 <div className="space-y-2">
@@ -186,7 +194,7 @@ export default function Login() {
                     onValueChange={(value: 'gestor' | 'cliente') => setSignupRole(value)}
                     disabled={isSubmitting}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="border-white/20 bg-white/10 text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -209,7 +217,8 @@ export default function Login() {
             </TabsContent>
           </Tabs>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

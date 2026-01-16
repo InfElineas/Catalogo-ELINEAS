@@ -34,6 +34,7 @@ const gestorNavItems = [
 
 const clienteNavItems = [
   { icon: LayoutDashboard, label: "Mis Catálogos", href: "/cliente" },
+  { icon: Settings, label: "Perfil", href: "/configuracion" },
 ];
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -69,8 +70,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
             <Link to={isGestor ? "/dashboard" : "/cliente"} className="flex items-center gap-2">
-              <FileSpreadsheet className="h-6 w-6 text-sidebar-primary" />
-              <span className="text-lg font-semibold">CatalogCMS</span>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary/10">
+                <img src="/brand-mark.svg" alt="Catalogia" className="h-6 w-6" />
+              </div>
+              <div className="leading-tight">
+                <span className="text-lg font-semibold">Catalogia</span>
+                <span className="block text-[11px] text-sidebar-foreground/60">Catálogos conectados</span>
+              </div>
             </Link>
             <Button 
               variant="ghost" 

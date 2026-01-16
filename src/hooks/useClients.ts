@@ -26,6 +26,65 @@ export function useClients() {
   return useQuery({
     queryKey: ['clients'],
     queryFn: async (): Promise<ClientWithCatalogs[]> => {
+      if (!user) return [];
+
+      const { data: existingClients, error: existingError } = await supabase
+        .from('clients')
+        .select('*');
+
+      if (existingError) throw existingError;
+
+      const { data: roleClients, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'cliente');
+
+      if (roleError) throw roleError;
+
+      const roleUserIds = (roleClients || []).map((role) => role.user_id);
+
+      if (roleUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .in('id', roleUserIds);
+
+        if (profilesError) throw profilesError;
+
+        const clientsByUserId = new Map(
+          (existingClients || []).filter((client) => client.user_id).map((client) => [client.user_id as string, client])
+        );
+        const clientsByEmail = new Map(
+          (existingClients || []).map((client) => [client.email.toLowerCase(), client])
+        );
+
+        const upsertEntries: Array<Pick<Client, 'name' | 'email' | 'status' | 'user_id' | 'created_by' | 'deleted_at'>> = [];
+
+        (profiles || []).forEach((profile) => {
+          const profileEmail = profile.email.toLowerCase();
+          const existingByUser = clientsByUserId.get(profile.id);
+          const existingByEmail = clientsByEmail.get(profileEmail);
+          const fallbackName = profile.full_name || profile.email.split('@')[0];
+
+          upsertEntries.push({
+            name: existingByUser?.name || existingByEmail?.name || fallbackName,
+            email: profile.email,
+            status: 'active',
+            user_id: profile.id,
+            created_by: existingByUser?.created_by || existingByEmail?.created_by || user.id,
+            deleted_at: null,
+          });
+        });
+
+        if (upsertEntries.length > 0) {
+          const { error: upsertError } = await supabase
+            .from('clients')
+            .upsert(upsertEntries, { onConflict: 'email' });
+
+          if (upsertError) throw upsertError;
+        }
+      }
+
       const { data: clients, error } = await supabase
         .from('clients')
         .select('*')
@@ -64,12 +123,49 @@ export function useCreateClient() {
     mutationFn: async (data: { name: string; email: string }) => {
       if (!user) throw new Error('Not authenticated');
 
+      const normalizedEmail = data.email.trim().toLowerCase();
+
+      const { data: existingClient, error: existingError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (existingClient) {
+        const { data: updatedClient, error: updateError } = await supabase
+          .from('clients')
+          .update({
+            name: data.name,
+            user_id: existingClient.user_id || profile?.id || null,
+            deleted_at: null,
+            status: 'active',
+          })
+          .eq('id', existingClient.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        return updatedClient;
+      }
+
       const { data: client, error } = await supabase
         .from('clients')
         .insert({
           name: data.name,
-          email: data.email,
+          email: normalizedEmail,
+          status: 'active',
           created_by: user.id,
+          user_id: profile?.id || null,
         })
         .select()
         .single();
