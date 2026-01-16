@@ -30,8 +30,7 @@ export function useClients() {
 
       const { data: existingClients, error: existingError } = await supabase
         .from('clients')
-        .select('*')
-        .is('deleted_at', null);
+        .select('*');
 
       if (existingError) throw existingError;
 
@@ -59,56 +58,30 @@ export function useClients() {
           (existingClients || []).map((client) => [client.email.toLowerCase(), client])
         );
 
-        const inserts: Array<Pick<Client, 'name' | 'email' | 'status' | 'user_id' | 'created_by'>> = [];
-        const updates: Array<{ id: string; data: { user_id?: string; email?: string } }> = [];
+        const upsertEntries: Array<Pick<Client, 'name' | 'email' | 'status' | 'user_id' | 'created_by' | 'deleted_at'>> = [];
 
         (profiles || []).forEach((profile) => {
           const profileEmail = profile.email.toLowerCase();
           const existingByUser = clientsByUserId.get(profile.id);
           const existingByEmail = clientsByEmail.get(profileEmail);
-
-          if (existingByUser) {
-            if (existingByUser.email !== profile.email) {
-              updates.push({ id: existingByUser.id, data: { email: profile.email } });
-            }
-            return;
-          }
-
-          if (existingByEmail) {
-            if (!existingByEmail.user_id) {
-              updates.push({ id: existingByEmail.id, data: { user_id: profile.id } });
-            }
-            return;
-          }
-
           const fallbackName = profile.full_name || profile.email.split('@')[0];
 
-          inserts.push({
-            name: fallbackName,
+          upsertEntries.push({
+            name: existingByUser?.name || existingByEmail?.name || fallbackName,
             email: profile.email,
-            status: 'active',
+            status: existingByUser?.status || existingByEmail?.status || 'active',
             user_id: profile.id,
-            created_by: user.id,
+            created_by: existingByUser?.created_by || existingByEmail?.created_by || user.id,
+            deleted_at: null,
           });
         });
 
-        if (updates.length > 0) {
-          await Promise.all(
-            updates.map((update) =>
-              supabase
-                .from('clients')
-                .update(update.data)
-                .eq('id', update.id)
-            )
-          );
-        }
-
-        if (inserts.length > 0) {
-          const { error: insertError } = await supabase
+        if (upsertEntries.length > 0) {
+          const { error: upsertError } = await supabase
             .from('clients')
-            .insert(inserts);
+            .upsert(upsertEntries, { onConflict: 'email' });
 
-          if (insertError) throw insertError;
+          if (upsertError) throw upsertError;
         }
       }
 
