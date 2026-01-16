@@ -44,6 +44,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const ensureUserRole = async (userId: string, metadataRole: AppRole) => {
+    if (!metadataRole) return;
+
+    const { error } = await supabase
+      .from('user_roles')
+      .insert({ user_id: userId, role: metadataRole });
+
+    if (error) {
+      if (error.code !== '23505') {
+        console.error('Error ensuring user role:', error);
+      }
+    }
+  };
+
+  const resolveRole = async (userId: string, metadataRole: AppRole): Promise<AppRole> => {
+    const roleFromDb = await fetchUserRole(userId);
+    if (roleFromDb) return roleFromDb;
+    if (metadataRole) {
+      await ensureUserRole(userId, metadataRole);
+      return metadataRole;
+    }
+    return null;
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -54,7 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (newSession?.user) {
           // Use setTimeout to avoid potential deadlock with Supabase client
           setTimeout(async () => {
-            const userRole = await fetchUserRole(newSession.user.id);
+            const metadataRole = newSession.user.user_metadata?.role as AppRole;
+            const userRole = await resolveRole(newSession.user.id, metadataRole);
             setRole(userRole);
             setLoading(false);
           }, 0);
@@ -71,7 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(existingSession?.user ?? null);
       
       if (existingSession?.user) {
-        fetchUserRole(existingSession.user.id).then(userRole => {
+        const metadataRole = existingSession.user.user_metadata?.role as AppRole;
+        resolveRole(existingSession.user.id, metadataRole).then((userRole) => {
           setRole(userRole);
           setLoading(false);
         });
