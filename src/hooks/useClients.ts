@@ -150,12 +150,48 @@ export function useCreateClient() {
     mutationFn: async (data: { name: string; email: string }) => {
       if (!user) throw new Error('Not authenticated');
 
+      const normalizedEmail = data.email.trim().toLowerCase();
+
+      const { data: existingClient, error: existingError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (existingClient) {
+        const { data: updatedClient, error: updateError } = await supabase
+          .from('clients')
+          .update({
+            name: data.name,
+            user_id: existingClient.user_id || profile?.id || null,
+            deleted_at: null,
+            status: existingClient.status === 'inactive' ? 'pending' : existingClient.status,
+          })
+          .eq('id', existingClient.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        return updatedClient;
+      }
+
       const { data: client, error } = await supabase
         .from('clients')
         .insert({
           name: data.name,
-          email: data.email,
+          email: normalizedEmail,
           created_by: user.id,
+          user_id: profile?.id || null,
         })
         .select()
         .single();
