@@ -11,6 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Search, 
   FileDown,
@@ -25,6 +31,8 @@ import { useClientCatalogs, useClientCatalogItems } from "@/hooks/useClientCatal
 import { useGestors } from "@/hooks/useGestors";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { exportCatalogToCSV, exportCatalogToExcel } from "@/lib/excelExporter";
+import { toast } from "sonner";
 
 export default function ClienteDashboard() {
   const { data: catalogs, isLoading: catalogsLoading } = useClientCatalogs();
@@ -124,10 +132,46 @@ export default function ClienteDashboard() {
             </p>
           </div>
           {currentCatalog && (
-            <Button size="lg" className="gap-2">
-              <FileDown className="h-5 w-5" />
-              Descargar PDF
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="lg" className="gap-2">
+                  <FileDown className="h-5 w-5" />
+                  Descargar catálogo
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => {
+                    try {
+                      exportCatalogToExcel(items || [], {
+                        catalogName: currentCatalog.name,
+                        includeInactive: true,
+                      });
+                      toast.success('Catálogo exportado en Excel');
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : 'Error al exportar el catálogo');
+                    }
+                  }}
+                >
+                  Descargar en Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    try {
+                      exportCatalogToCSV(items || [], {
+                        catalogName: currentCatalog.name,
+                        includeInactive: true,
+                      });
+                      toast.success('Catálogo exportado en CSV');
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : 'Error al exportar el catálogo');
+                    }
+                  }}
+                >
+                  Descargar en CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
 
