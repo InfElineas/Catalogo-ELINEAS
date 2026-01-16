@@ -15,13 +15,20 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppConfig, useUpdateConfig } from "@/hooks/useAppConfig";
+import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useGestorProfile, useUpdateGestorProfile } from "@/hooks/useGestorProfile";
 import { useAuth } from "@/contexts/AuthContext";
-import { Settings, FileText, Upload, Building2, Save } from "lucide-react";
+import { FileText, Upload, Building2, Save, User } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Configuracion() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { data: config, isLoading, error } = useAppConfig();
   const updateConfig = useUpdateConfig();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: gestorProfile, isLoading: gestorLoading } = useGestorProfile();
+  const updateGestorProfile = useUpdateGestorProfile();
+  const updateProfile = useUpdateProfile();
 
   // Local state for form fields
   const [generalForm, setGeneralForm] = useState({
@@ -39,6 +46,15 @@ export default function Configuracion() {
     skip_empty_rows: true,
   });
   const [initialized, setInitialized] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    full_name: '',
+    avatar_url: '',
+  });
+  const [gestorForm, setGestorForm] = useState({
+    sales_description: '',
+  });
+  const [gestorInitialized, setGestorInitialized] = useState(false);
+  const [profileInitialized, setProfileInitialized] = useState(false);
 
   // Initialize forms when config loads
   if (config && !initialized) {
@@ -46,6 +62,21 @@ export default function Configuracion() {
     setPdfForm(config.pdf);
     setImportForm(config.import);
     setInitialized(true);
+  }
+
+  if (profile && !profileInitialized) {
+    setProfileForm({
+      full_name: profile.full_name || '',
+      avatar_url: profile.avatar_url || '',
+    });
+    setProfileInitialized(true);
+  }
+
+  if (gestorProfile && !gestorInitialized) {
+    setGestorForm({
+      sales_description: gestorProfile.sales_description || '',
+    });
+    setGestorInitialized(true);
   }
 
   const handleSaveGeneral = async () => {
@@ -58,6 +89,19 @@ export default function Configuracion() {
 
   const handleSaveImport = async () => {
     await updateConfig.mutateAsync({ key: 'import', value: importForm });
+  };
+
+  const handleSaveProfile = async () => {
+    await updateProfile.mutateAsync({
+      full_name: profileForm.full_name,
+      avatar_url: profileForm.avatar_url || null,
+    });
+  };
+
+  const handleSaveGestorProfile = async () => {
+    await updateGestorProfile.mutateAsync({
+      sales_description: gestorForm.sales_description || null,
+    });
   };
 
   if (error) {
@@ -106,8 +150,18 @@ export default function Configuracion() {
             </Card>
           </div>
         ) : (
-          <Tabs defaultValue="general" className="space-y-4">
+          <Tabs defaultValue="perfil" className="space-y-4">
             <TabsList>
+              <TabsTrigger value="perfil" className="gap-2">
+                <User className="h-4 w-4" />
+                Perfil
+              </TabsTrigger>
+              {role === 'gestor' && (
+                <TabsTrigger value="comercial" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Comercial
+                </TabsTrigger>
+              )}
               <TabsTrigger value="general" className="gap-2">
                 <Building2 className="h-4 w-4" />
                 General
@@ -121,6 +175,94 @@ export default function Configuracion() {
                 Importación
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="perfil">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Perfil</CardTitle>
+                  <CardDescription>
+                    Actualiza tu información pública de usuario.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {profileLoading ? (
+                    <Skeleton className="h-24 w-full" />
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-name">Nombre completo</Label>
+                        <Input
+                          id="profile-name"
+                          value={profileForm.full_name}
+                          onChange={(e) => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
+                          placeholder="Tu nombre"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-email">Email</Label>
+                        <Input
+                          id="profile-email"
+                          value={profile?.email || user?.email || ''}
+                          disabled
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="profile-avatar">URL de avatar</Label>
+                        <Input
+                          id="profile-avatar"
+                          value={profileForm.avatar_url}
+                          onChange={(e) => setProfileForm(prev => ({ ...prev, avatar_url: e.target.value }))}
+                          placeholder="https://..."
+                        />
+                      </div>
+                      <div className="pt-4">
+                        <Button onClick={handleSaveProfile} disabled={updateProfile.isPending}>
+                          <Save className="h-4 w-4 mr-2" />
+                          {updateProfile.isPending ? 'Guardando...' : 'Guardar perfil'}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {role === 'gestor' && (
+              <TabsContent value="comercial">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Perfil comercial</CardTitle>
+                    <CardDescription>
+                      Comparte una descripción para que los clientes te contacten.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {gestorLoading ? (
+                      <Skeleton className="h-24 w-full" />
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="sales-description">Descripción comercial</Label>
+                          <Textarea
+                            id="sales-description"
+                            value={gestorForm.sales_description}
+                            onChange={(e) => setGestorForm({ sales_description: e.target.value })}
+                            placeholder="Ej. Ayudo a equipos comerciales a mantener catálogos actualizados."
+                            rows={4}
+                          />
+                        </div>
+                        <div className="pt-4">
+                          <Button onClick={handleSaveGestorProfile} disabled={updateGestorProfile.isPending}>
+                            <Save className="h-4 w-4 mr-2" />
+                            {updateGestorProfile.isPending ? 'Guardando...' : 'Guardar descripción'}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
 
             <TabsContent value="general">
               <Card>
