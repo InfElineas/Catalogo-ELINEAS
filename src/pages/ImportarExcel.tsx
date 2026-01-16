@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,16 +27,22 @@ import {
   Loader2,
   Edit
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ColumnMapper, ColumnMapping, SystemField } from "@/components/import/ColumnMapper";
 import { ValidationEditor } from "@/components/import/ValidationEditor";
 import { parseExcelFile, getPreviewRows, type ParsedExcelData } from "@/lib/excelParser";
 import { validateData, type ValidationResult, type ValidationError } from "@/lib/dataValidator";
 import { useImportCatalog } from "@/hooks/useImportCatalog";
+import { useUpdateCatalogImport } from "@/hooks/useUpdateCatalogImport";
+import { useCatalog } from "@/hooks/useCatalogs";
+import { useCatalogItems, useCatalogVersions } from "@/hooks/useCatalogItems";
+import { CatalogDiffView, type ApplyOptions } from "@/components/import/CatalogDiffView";
+import { createCatalogDiff, type CatalogItemData, type DiffResult } from "@/lib/catalogDiff";
+import { transformRowToCatalogItem } from "@/lib/dataValidator";
 import { toast } from "sonner";
 
-type ImportStep = "upload" | "mapping" | "validation" | "importing" | "complete";
+type ImportStep = "upload" | "mapping" | "validation" | "diff" | "importing" | "complete";
 
 const expectedColumns: SystemField[] = [
   { key: "codigo", label: "Codigo", required: true, description: "Código único del producto (SKU)" },
@@ -61,7 +67,9 @@ const expectedColumns: SystemField[] = [
 ];
 
 export default function ImportarExcel() {
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const catalogId = searchParams.get('catalogId') || '';
+  const isUpdateMode = Boolean(catalogId);
   const [step, setStep] = useState<ImportStep>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -81,8 +89,20 @@ export default function ImportarExcel() {
   
   // Import result
   const [importResult, setImportResult] = useState<{ catalogId: string; itemsImported: number } | null>(null);
+  const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
   
   const importCatalog = useImportCatalog();
+  const updateCatalog = useUpdateCatalogImport();
+  const { data: catalog } = useCatalog(catalogId);
+  const { data: versions } = useCatalogVersions(catalogId);
+  const currentVersion = versions?.[0];
+  const { data: currentItems } = useCatalogItems(currentVersion?.id);
+
+  useEffect(() => {
+    if (catalog && isUpdateMode) {
+      setCatalogName(catalog.name);
+    }
+  }, [catalog, isUpdateMode]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -200,6 +220,11 @@ export default function ImportarExcel() {
   const handleConfirmImport = async () => {
     if (!excelData || columnMappings.length === 0) return;
     
+    if (isUpdateMode) {
+      handleBuildDiff();
+      return;
+    }
+
     setStep("importing");
     
     try {
@@ -221,6 +246,123 @@ export default function ImportarExcel() {
     } catch (error) {
       console.error('Import failed:', error);
       setStep("validation");
+    }
+  };
+
+  const getTransformedItems = (): CatalogItemData[] => {
+    if (!excelData) return [];
+
+    return excelData.rows.map((row) => {
+      const transformed = transformRowToCatalogItem(row, columnMappings);
+      return {
+        code: transformed.code as string,
+        name: transformed.name as string,
+        price_usd: transformed.price_usd as number,
+        category: transformed.category as string | null,
+        category_f1: transformed.category_f1 as string | null,
+        category_f2: transformed.category_f2 as string | null,
+        category_f3: transformed.category_f3 as string | null,
+        supplier: transformed.supplier as string | null,
+        warehouse: transformed.warehouse as string | null,
+        store_id: transformed.store_id as string | null,
+        store_name: transformed.store_name as string | null,
+        image_url: transformed.image_url as string | null,
+        image_filter: transformed.image_filter as string | null,
+        states: transformed.states as Record<string, string>,
+        extra_prices: transformed.extra_prices as Record<string, number>,
+        flags: transformed.flags as Record<string, boolean>,
+        is_selected: transformed.is_selected as boolean,
+        is_active: transformed.is_active as boolean,
+      };
+    });
+  };
+
+  const getExistingItems = (): CatalogItemData[] => {
+    return (currentItems || []).map((item) => ({
+      code: item.code,
+      name: item.name,
+      price_usd: item.price_usd,
+      category: item.category,
+      category_f1: (item as unknown as { category_f1: string | null }).category_f1 ?? null,
+      category_f2: (item as unknown as { category_f2: string | null }).category_f2 ?? null,
+      category_f3: (item as unknown as { category_f3: string | null }).category_f3 ?? null,
+      supplier: (item as unknown as { supplier: string | null }).supplier ?? null,
+      warehouse: (item as unknown as { warehouse: string | null }).warehouse ?? null,
+      store_id: (item as unknown as { store_id: string | null }).store_id ?? null,
+      store_name: (item as unknown as { store_name: string | null }).store_name ?? null,
+      image_url: (item as unknown as { image_url: string | null }).image_url ?? null,
+      image_filter: (item as unknown as { image_filter: string | null }).image_filter ?? null,
+      states: (item as unknown as { states: Record<string, string> | null }).states ?? {},
+      extra_prices: (item as unknown as { extra_prices: Record<string, number> | null }).extra_prices ?? {},
+      flags: (item as unknown as { flags: Record<string, boolean> | null }).flags ?? {},
+      is_selected: item.is_selected,
+      is_active: item.is_active,
+    }));
+  };
+
+  const handleBuildDiff = () => {
+    if (!currentVersion) {
+      toast.error('No se encontró una versión base del catálogo.');
+      return;
+    }
+
+    const diff = createCatalogDiff(getExistingItems(), getTransformedItems());
+    setDiffResult(diff);
+    setStep("diff");
+  };
+
+  const handleApplyUpdate = async (options: ApplyOptions) => {
+    if (!catalogId || !currentVersion || !diffResult) return;
+
+    setStep("importing");
+
+    const newItemsByCode = new Map(diffResult.newItems.map((item) => [item.code, item.newItem]));
+    const modifiedItemsByCode = new Map(diffResult.modifiedItems.map((item) => [item.code, item.newItem]));
+    const existingItemsByCode = new Map(getExistingItems().map((item) => [item.code, item]));
+
+    const mergedItems = new Map<string, CatalogItemData>();
+
+    existingItemsByCode.forEach((item, code) => {
+      mergedItems.set(code, item);
+    });
+
+    options.selectedModifiedCodes.forEach((code) => {
+      const updated = modifiedItemsByCode.get(code);
+      if (updated) {
+        mergedItems.set(code, updated as CatalogItemData);
+      }
+    });
+
+    options.selectedNewCodes.forEach((code) => {
+      const created = newItemsByCode.get(code);
+      if (created) {
+        mergedItems.set(code, created as CatalogItemData);
+      }
+    });
+
+    options.selectedDeletedCodes.forEach((code) => {
+      mergedItems.delete(code);
+    });
+
+    try {
+      const result = await updateCatalog.mutateAsync({
+        catalogId,
+        baseVersionNumber: currentVersion.version_number,
+        items: Array.from(mergedItems.values()),
+        onProgress: (prog, msg) => {
+          setProgress(prog);
+          setProgressMessage(msg);
+        },
+      });
+
+      setImportResult({
+        catalogId: result.catalogId,
+        itemsImported: result.itemsImported,
+      });
+      setStep("complete");
+    } catch (error) {
+      console.error('Update failed:', error);
+      setStep("diff");
     }
   };
 
@@ -266,9 +408,13 @@ export default function ImportarExcel() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Importar Excel</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isUpdateMode ? "Actualizar catálogo" : "Importar Excel"}
+          </h1>
           <p className="text-muted-foreground">
-            Sube un archivo .xlsx para crear o actualizar un catálogo
+            {isUpdateMode
+              ? "Sube un archivo .xlsx para comparar y actualizar productos."
+              : "Sube un archivo .xlsx para crear o actualizar un catálogo"}
           </p>
         </div>
 
@@ -278,9 +424,12 @@ export default function ImportarExcel() {
             { key: "upload", label: "Subir archivo" },
             { key: "mapping", label: "Mapeo de columnas" },
             { key: "validation", label: "Validación" },
+            ...(isUpdateMode ? [{ key: "diff", label: "Cambios" }] : []),
             { key: "complete", label: "Completado" },
           ].map((s, index) => {
-            const stepKeys = ["upload", "mapping", "validation", "complete"];
+            const stepKeys = isUpdateMode
+              ? ["upload", "mapping", "validation", "diff", "complete"]
+              : ["upload", "mapping", "validation", "complete"];
             const currentIndex = stepKeys.indexOf(step === "importing" ? "validation" : step);
             const isActive = s.key === step || (s.key === "validation" && step === "importing");
             const isCompleted = stepKeys.indexOf(s.key) < currentIndex;
@@ -303,7 +452,7 @@ export default function ImportarExcel() {
                     {s.label}
                   </span>
                 </div>
-                {index < 3 && (
+                {index < stepKeys.length - 1 && (
                   <div className={cn(
                     "w-12 h-0.5 mx-2",
                     isCompleted ? "bg-primary" : "bg-muted-foreground/30"
@@ -392,6 +541,7 @@ export default function ImportarExcel() {
                     value={catalogName}
                     onChange={(e) => setCatalogName(e.target.value)}
                     placeholder="Ej: Lista de Precios Q1 2024"
+                    disabled={isUpdateMode}
                   />
                 </div>
               )}
@@ -626,7 +776,7 @@ export default function ImportarExcel() {
                       'Corrige los errores primero'
                     ) : (
                       <>
-                        Confirmar importación
+                        {isUpdateMode ? "Comparar cambios" : "Confirmar importación"}
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </>
                     )}
@@ -635,6 +785,15 @@ export default function ImportarExcel() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {step === "diff" && diffResult && (
+          <CatalogDiffView
+            diff={diffResult}
+            onApply={handleApplyUpdate}
+            onBack={() => setStep("validation")}
+            isApplying={updateCatalog.isPending}
+          />
         )}
 
         {step === "validation" && isEditingErrors && excelData && validationResult && (
@@ -653,7 +812,9 @@ export default function ImportarExcel() {
             <CardContent className="py-12">
               <div className="flex flex-col items-center text-center">
                 <Loader2 className="h-16 w-16 text-primary animate-spin mb-6" />
-                <h2 className="text-2xl font-bold mb-2">Importando catálogo...</h2>
+                <h2 className="text-2xl font-bold mb-2">
+                  {isUpdateMode ? "Aplicando cambios..." : "Importando catálogo..."}
+                </h2>
                 <p className="text-muted-foreground mb-6 max-w-md">
                   {progressMessage}
                 </p>
@@ -673,9 +834,13 @@ export default function ImportarExcel() {
                 <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mb-6">
                   <CheckCircle2 className="h-10 w-10 text-success" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">¡Importación completada!</h2>
+                <h2 className="text-2xl font-bold mb-2">
+                  {isUpdateMode ? "¡Actualización completada!" : "¡Importación completada!"}
+                </h2>
                 <p className="text-muted-foreground mb-6 max-w-md">
-                  Se han importado exitosamente {importResult.itemsImported.toLocaleString()} productos al catálogo "{catalogName}".
+                  {isUpdateMode
+                    ? `Se han actualizado ${importResult.itemsImported.toLocaleString()} productos en el catálogo "${catalogName}".`
+                    : `Se han importado exitosamente ${importResult.itemsImported.toLocaleString()} productos al catálogo "${catalogName}".`}
                   El catálogo está en estado borrador.
                 </p>
                 <div className="flex gap-3">

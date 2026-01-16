@@ -26,6 +26,92 @@ export function useClients() {
   return useQuery({
     queryKey: ['clients'],
     queryFn: async (): Promise<ClientWithCatalogs[]> => {
+      if (!user) return [];
+
+      const { data: existingClients, error: existingError } = await supabase
+        .from('clients')
+        .select('*')
+        .is('deleted_at', null);
+
+      if (existingError) throw existingError;
+
+      const { data: roleClients, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'cliente');
+
+      if (roleError) throw roleError;
+
+      const roleUserIds = (roleClients || []).map((role) => role.user_id);
+
+      if (roleUserIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .in('id', roleUserIds);
+
+        if (profilesError) throw profilesError;
+
+        const clientsByUserId = new Map(
+          (existingClients || []).filter((client) => client.user_id).map((client) => [client.user_id as string, client])
+        );
+        const clientsByEmail = new Map(
+          (existingClients || []).map((client) => [client.email.toLowerCase(), client])
+        );
+
+        const inserts: Array<Pick<Client, 'name' | 'email' | 'status' | 'user_id' | 'created_by'>> = [];
+        const updates: Array<{ id: string; data: { user_id?: string; email?: string } }> = [];
+
+        (profiles || []).forEach((profile) => {
+          const profileEmail = profile.email.toLowerCase();
+          const existingByUser = clientsByUserId.get(profile.id);
+          const existingByEmail = clientsByEmail.get(profileEmail);
+
+          if (existingByUser) {
+            if (existingByUser.email !== profile.email) {
+              updates.push({ id: existingByUser.id, data: { email: profile.email } });
+            }
+            return;
+          }
+
+          if (existingByEmail) {
+            if (!existingByEmail.user_id) {
+              updates.push({ id: existingByEmail.id, data: { user_id: profile.id } });
+            }
+            return;
+          }
+
+          const fallbackName = profile.full_name || profile.email.split('@')[0];
+
+          inserts.push({
+            name: fallbackName,
+            email: profile.email,
+            status: 'active',
+            user_id: profile.id,
+            created_by: user.id,
+          });
+        });
+
+        if (updates.length > 0) {
+          await Promise.all(
+            updates.map((update) =>
+              supabase
+                .from('clients')
+                .update(update.data)
+                .eq('id', update.id)
+            )
+          );
+        }
+
+        if (inserts.length > 0) {
+          const { error: insertError } = await supabase
+            .from('clients')
+            .insert(inserts);
+
+          if (insertError) throw insertError;
+        }
+      }
+
       const { data: clients, error } = await supabase
         .from('clients')
         .select('*')
@@ -64,12 +150,48 @@ export function useCreateClient() {
     mutationFn: async (data: { name: string; email: string }) => {
       if (!user) throw new Error('Not authenticated');
 
+      const normalizedEmail = data.email.trim().toLowerCase();
+
+      const { data: existingClient, error: existingError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (existingClient) {
+        const { data: updatedClient, error: updateError } = await supabase
+          .from('clients')
+          .update({
+            name: data.name,
+            user_id: existingClient.user_id || profile?.id || null,
+            deleted_at: null,
+            status: existingClient.status === 'inactive' ? 'pending' : existingClient.status,
+          })
+          .eq('id', existingClient.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        return updatedClient;
+      }
+
       const { data: client, error } = await supabase
         .from('clients')
         .insert({
           name: data.name,
-          email: data.email,
+          email: normalizedEmail,
           created_by: user.id,
+          user_id: profile?.id || null,
         })
         .select()
         .single();
