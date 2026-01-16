@@ -63,7 +63,8 @@ import {
   ImageOff,
   Send,
   UserPlus,
-  UserMinus
+  UserMinus,
+  RefreshCw
 } from "lucide-react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useCatalog, useUpdateCatalog } from "@/hooks/useCatalogs";
@@ -229,6 +230,12 @@ export default function CatalogoDetalle() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link to={`/catalogos/importar?catalogId=${catalog.id}`}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Actualizar
+              </Link>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
