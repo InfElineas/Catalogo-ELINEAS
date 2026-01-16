@@ -121,7 +121,7 @@ export default function CatalogoDetalle() {
   // Get assigned clients
   const assignedClients = catalog?.assigned_clients || [];
   const unassignedClients = (allClients || []).filter(
-    c => !assignedClients.some((ac: { id: string }) => ac.id === c.id) && c.status === 'active'
+    c => !assignedClients.some((ac: { id: string }) => ac.id === c.id) && c.status !== 'inactive'
   );
 
   const handleEditCatalog = () => {
