@@ -9,6 +9,7 @@ export interface Client {
   email: string;
   status: 'active' | 'pending' | 'inactive';
   user_id: string | null;
+  gestor_id: string | null;
   last_access: string | null;
   created_by: string;
   created_at: string;
@@ -30,7 +31,8 @@ export function useClients() {
 
       const { data: existingClients, error: existingError } = await supabase
         .from('clients')
-        .select('*');
+        .select('*')
+        .eq('gestor_id', user.id);
 
       if (existingError) throw existingError;
 
@@ -58,7 +60,7 @@ export function useClients() {
           (existingClients || []).map((client) => [client.email.toLowerCase(), client])
         );
 
-        const upsertEntries: Array<Pick<Client, 'name' | 'email' | 'status' | 'user_id' | 'created_by' | 'deleted_at'>> = [];
+        const upsertEntries: Array<Pick<Client, 'name' | 'email' | 'status' | 'user_id' | 'created_by' | 'deleted_at' | 'gestor_id'>> = [];
 
         (profiles || []).forEach((profile) => {
           const profileEmail = profile.email.toLowerCase();
@@ -72,6 +74,7 @@ export function useClients() {
             status: 'active',
             user_id: profile.id,
             created_by: existingByUser?.created_by || existingByEmail?.created_by || user.id,
+            gestor_id: existingByUser?.gestor_id || existingByEmail?.gestor_id || user.id,
             deleted_at: null,
           });
         });
@@ -88,6 +91,7 @@ export function useClients() {
       const { data: clients, error } = await supabase
         .from('clients')
         .select('*')
+        .eq('gestor_id', user.id)
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
@@ -149,6 +153,7 @@ export function useCreateClient() {
             user_id: existingClient.user_id || profile?.id || null,
             deleted_at: null,
             status: 'active',
+            gestor_id: existingClient.gestor_id || user.id,
           })
           .eq('id', existingClient.id)
           .select()
@@ -165,6 +170,7 @@ export function useCreateClient() {
           email: normalizedEmail,
           status: 'active',
           created_by: user.id,
+          gestor_id: user.id,
           user_id: profile?.id || null,
         })
         .select()
