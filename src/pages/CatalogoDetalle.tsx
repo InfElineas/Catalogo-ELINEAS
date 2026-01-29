@@ -76,6 +76,7 @@ import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { exportCatalogToExcel, exportCatalogToCSV } from "@/lib/excelExporter";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 
 export default function CatalogoDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -425,12 +426,14 @@ export default function CatalogoDetalle() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredItems.map((item) => (
+                        {filteredItems.map((item) => {
+                          const imageUrl = normalizeImageUrl(item.image_url);
+                          return (
                           <TableRow key={item.id} className={!item.is_active ? 'opacity-50' : ''}>
                             <TableCell>
-                              {item.image_url ? (
+                              {imageUrl ? (
                                 <img 
-                                  src={item.image_url} 
+                                  src={imageUrl} 
                                   alt={item.name}
                                   className="h-10 w-10 rounded object-cover"
                                 />
@@ -494,7 +497,7 @@ export default function CatalogoDetalle() {
                               </DropdownMenu>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )})}
                       </TableBody>
                     </Table>
                   </div>

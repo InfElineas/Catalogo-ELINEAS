@@ -1,4 +1,5 @@
 import type { ColumnMapping } from '@/components/import/ColumnMapper';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 export interface ValidationError {
   row: number;
@@ -374,7 +375,7 @@ export function transformRowToCatalogItem(
     warehouse: getValue('almacen'),
     store_id: getValue('id_tienda'),
     store_name: getValue('tienda'),
-    image_url: getValue('imagen'),
+    image_url: normalizeImageUrl(getValue('imagen')),
     image_filter: getValue('filtro_imagenes'),
     states: Object.keys(states).length > 0 ? states : {},
     extra_prices: Object.keys(extraPrices).length > 0 ? extraPrices : {},

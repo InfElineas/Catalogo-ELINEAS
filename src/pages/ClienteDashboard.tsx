@@ -32,6 +32,7 @@ import { useGestors } from "@/hooks/useGestors";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { exportCatalogToCSV, exportCatalogToExcel } from "@/lib/excelExporter";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 import { toast } from "sonner";
 
 export default function ClienteDashboard() {
@@ -283,16 +284,18 @@ export default function ClienteDashboard() {
                 {/* Grid View */}
                 {viewMode === "grid" && (
                   <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {filteredItems.map((item) => (
+                    {filteredItems.map((item) => {
+                      const imageUrl = normalizeImageUrl(item.image_url);
+                      return (
                       <Card 
                         key={item.id} 
                         className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
                       >
                         {/* Image Container */}
                         <div className="relative aspect-square overflow-hidden bg-muted">
-                          {item.image_url ? (
+                          {imageUrl ? (
                             <img 
-                              src={item.image_url} 
+                              src={imageUrl} 
                               alt={item.name}
                               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                             />
@@ -350,14 +353,16 @@ export default function ClienteDashboard() {
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
+                    )})}
                   </div>
                 )}
 
                 {/* List View */}
                 {viewMode === "list" && (
                   <div className="space-y-3">
-                    {filteredItems.map((item) => (
+                    {filteredItems.map((item) => {
+                      const imageUrl = normalizeImageUrl(item.image_url);
+                      return (
                       <Card 
                         key={item.id} 
                         className="group overflow-hidden transition-all duration-200 hover:shadow-lg"
@@ -365,9 +370,9 @@ export default function ClienteDashboard() {
                         <div className="flex items-center gap-4 p-4">
                           {/* Image */}
                           <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                            {item.image_url ? (
+                            {imageUrl ? (
                               <img 
-                                src={item.image_url} 
+                                src={imageUrl} 
                                 alt={item.name}
                                 className="w-full h-full object-cover"
                               />
@@ -418,7 +423,7 @@ export default function ClienteDashboard() {
                           </div>
                         </div>
                       </Card>
-                    ))}
+                    )})}
                   </div>
                 )}
               </>
