@@ -43,6 +43,7 @@ export function useDashboardStats() {
         .from('clients')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active')
+        .eq('gestor_id', user.id)
         .is('deleted_at', null);
 
       // Count published versions
