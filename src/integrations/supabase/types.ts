@@ -255,6 +255,7 @@ export type Database = {
           created_by: string
           deleted_at: string | null
           email: string
+          gestor_id: string | null
           id: string
           last_access: string | null
           name: string
@@ -267,6 +268,7 @@ export type Database = {
           created_by: string
           deleted_at?: string | null
           email: string
+          gestor_id?: string | null
           id?: string
           last_access?: string | null
           name: string
@@ -279,6 +281,7 @@ export type Database = {
           created_by?: string
           deleted_at?: string | null
           email?: string
+          gestor_id?: string | null
           id?: string
           last_access?: string | null
           name?: string
@@ -286,7 +289,15 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_gestor_id_fkey"
+            columns: ["gestor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
